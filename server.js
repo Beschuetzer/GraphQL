@@ -122,7 +122,7 @@ const RootMutationType = new GraphQLObjectType({
       type: BookType,
       description: "Add a book",
       args: {
-        //GraphQLNonNull means null can't be passed in
+        //GraphQLNonNull means null can't be passed in therefore it is required when making query
         authorId: {type: GraphQLNonNull(GraphQLInt)},
         name: {type: GraphQLNonNull(GraphQLString)},
       },
@@ -146,6 +146,38 @@ const RootMutationType = new GraphQLObjectType({
         authors.push(author);
         return author;
       },
+    },
+    updateBook: {
+      type: BookType,
+      description: "Update Book",
+      args: {
+        name: {type: GraphQLString},
+        authorId: {type: GraphQLInt},
+        id: {type: GraphQLNonNull(GraphQLInt)},
+      },
+      resolve: (parent, args) => {
+        const book = {};
+        if (args.name) book['name'] = args.name;
+        if (args.authorId) book['authorId'] = args.authorId;
+        const index = books.findIndex(book => book.id === args.id);
+        books.splice(index, 1, book);
+        return book;
+      }
+    },
+    updateAuthor: {
+      type: AuthorType,
+      description: 'Update an Author',
+      args: {
+        id: {type: GraphQLNonNull(GraphQLInt)},
+        name: {type: GraphQLString},
+      },
+      resolve: (currentAuthor, args) => {
+        const newAuthor = {...currentAuthor};
+        if (args.name) newAuthor['name'] = args.name;
+        const index = authors.findIndex(author => author.id === args.id);
+        authors.splice(index, 1, newAuthor);
+        return newAuthor;
+      }
     }
   })
 })
