@@ -34,6 +34,7 @@ const books = [
 const BookType = new GraphQLObjectType({
   name: 'Book',
   description: 'This represents a book written by an author',
+  //fields has to be a function that returns an obj. because if you just return an object, you will run into Reference error saying a AuthorType/BookType is not defined when cros-referencing between types
   fields: () => ({
     id: {type: GraphQLNonNull(GraphQLInt)},
     name: {type: GraphQLNonNull(GraphQLString)},
@@ -43,7 +44,7 @@ const BookType = new GraphQLObjectType({
       type: AuthorType,
 
       //since author is not a property in the mock data object, we need a custom resolve telling graphQL what to return for this field
-      //resolve is called with two argument(parent [type that this is], args)
+      //resolve is a function called with two arguments(parent [type that this is], args)
       resolve: (book) => {
         return authors.find(author => author.id === book.authorId)
       }
@@ -79,10 +80,30 @@ const RootQueryType = new GraphQLObjectType({
   name: "Query",
   description: 'Root Query',
   fields: () => ({
+    book: {
+      type: BookType,
+      description: "A single book",
+      //The args obj. below defines what args are passed into resolve (..., args) method below
+      args: {
+        id: {type: GraphQLInt}
+      },
+      resolve: (book, args) => {
+        return books.find(book => book.id === args.id)
+      }
+    },
     books: {
       type: new GraphQLList(BookType),
       description: 'List of books',
       resolve: () => books
+    },
+    author: {
+      type: AuthorType,
+      description: 'A single Author',
+      args: {
+        id: {type: GraphQLInt},
+        name: {type: GraphQLString},
+      },
+      resolve: (author, args) => authors.find(author => author.id === args.id || (new RegExp(makeRegexIgnoreSpace(args.name), 'ig')).test(author.name))
     },
     authors: {
       type: new GraphQLList(AuthorType),
@@ -92,8 +113,48 @@ const RootQueryType = new GraphQLObjectType({
   }),
 })
 
+const RootMutationType = new GraphQLObjectType({
+  name: "Mutation",
+  description: 'Root Mutation',
+  fields: () => ({
+    //fields are the different operations for each mutation
+    addBook: {
+      type: BookType,
+      description: "Add a book",
+      args: {
+        //GraphQLNonNull means null can't be passed in
+        authorId: {type: GraphQLNonNull(GraphQLInt)},
+        name: {type: GraphQLNonNull(GraphQLString)},
+      },
+      resolve: (parent, args) => {
+        const book = { id: books.length + 1, name: args.name, authorId: args.authorId}
+        books.push(book);
+        return book;
+      }
+    },
+    addAuthor: {
+      type: AuthorType,
+      description: 'An Author',
+      args: {
+        name: {type: GraphQLNonNull(GraphQLString)},
+      },
+      resolve: (parent, args) => {
+        const author = {
+          id: authors.length + 1,
+          name: args.name,
+        }
+        authors.push(author);
+        return author;
+      },
+    }
+  })
+})
+
 const schema = new GraphQLSchema({
+  //Type used to make queries
   query: RootQueryType,
+  //Type used to mutate/make changes
+  mutation: RootMutationType,
 })
 
 app.use('/graphql', graphqlHTTP({
@@ -101,3 +162,11 @@ app.use('/graphql', graphqlHTTP({
   schema,
 }))
 app.listen(5000, () => {console.log("server running!")})
+
+
+function makeRegexIgnoreSpace(str) {
+  return str.split('')
+    .map(char => `\\s*${char}`)
+    .join('')
+    .replace(' ', '')
+}
